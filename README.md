@@ -24,7 +24,7 @@ docker run -d --name velociraptor \
   -p 8000:8000 \
   -p 8001:8001 \
   -p 8889:8889 \
-  zharfanug/velociraptor:0.74.5
+  zharfanug/velociraptor:latest
 ```
 
 # Environment
