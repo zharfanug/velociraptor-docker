@@ -1,0 +1,43 @@
+#!/usr/bin/with-contenv sh
+
+BIND_ADDRESS="0.0.0.0"
+
+if [ -z "$VELO_HOSTNAME" ]; then
+  VELO_HOSTNAME="$HOSTNAME"
+fi
+if [ -z "$VELO_FQDN" ]; then
+  VELO_FQDN="https://$VELO_HOSTNAME:8000/"
+fi
+
+if [ ! -f "$VELO_CONFIG/server.config.yaml" ]; then
+  if [ ! -f "$VELO_CERT" ] || [ ! -f "$VELO_CERT_KEY" ]; then
+    velociraptor config generate --merge '{"Client":{"server_urls":["'$VELO_FQDN'"],"use_self_signed_ssl":true,"writeback_windows":"HKLM\\SOFTWARE\\Velocidex\\Velociraptor"}, "Frontend":{"hostname":"'$VELO_HOSTNAME'"},"API":{"bind_address":"'$BIND_ADDRESS'"},"GUI":{"bind_address":"'$BIND_ADDRESS'"},"Monitoring":{"bind_address":"'$BIND_ADDRESS'"},"Logging":{"output_directory":"'$VELO_LOGS'","separate_logs_per_component":true},"Datastore":{"location":"'$VELO_DS'", "filestore_directory":"'$VELO_FS'"}}' > "$VELO_CONFIG/server.config.yaml"
+  else
+    velociraptor config generate --merge '{"Client":{"server_urls":["'$VELO_FQDN'"],"use_self_signed_ssl":false,"writeback_windows":"HKLM\\SOFTWARE\\Velocidex\\Velociraptor"}, "Frontend":{"tls_certificate_filename":"'$VELO_CERT'","tls_private_key_filename":"'$VELO_CERT_KEY'","hostname":"'$VELO_HOSTNAME'"},"API":{"bind_address":"'$BIND_ADDRESS'"},"GUI":{"bind_address":"'$BIND_ADDRESS'"},"Monitoring":{"bind_address":"'$BIND_ADDRESS'"},"Logging":{"output_directory":"'$VELO_LOGS'","separate_logs_per_component":true},"Datastore":{"location":"'$VELO_DS'", "filestore_directory":"'$VELO_FS'"}}' > "$VELO_CONFIG/server.config.yaml"
+  fi
+  if [ -z "$VELO_USER" ]; then
+    VELO_USER="admin"
+  fi
+  if [ -z "$VELO_PASSWORD" ]; then
+    VELO_PASSWORD="admin"
+  fi
+  velociraptor --config "$VELO_CONFIG/server.config.yaml" user add $VELO_USER $VELO_PASSWORD --role "administrator"
+  velociraptor --config "$VELO_CONFIG/server.config.yaml" config api_client --name $VELO_USER --role administrator "${VELO_FILES}/api.config.yaml"
+  VELO_URL_HOST=$(echo "$VELO_FQDN" | sed -E 's|^[a-z]+://([^/:]+).*|\1|')
+  sed -i "s|0.0.0.0|$VELO_URL_HOST|" "${VELO_FILES}/api.config.yaml"
+fi
+
+USE_SELF_SIGNED=$(velociraptor --config "$VELO_CONFIG/server.config.yaml" config show --json | jq -r '.Client.use_self_signed_ssl')
+if [ "$USE_SELF_SIGNED" = "true" ]; then
+  if true | velociraptor --config "$VELO_CONFIG/server.config.yaml" config show --json | jq -r .Frontend.certificate | openssl x509 -text -enddate -noout -checkend 604800 >/dev/null; then
+    echo "[INFO] Certificate is valid for more than 1 week. No action taken."
+  else
+    echo "[INFO] Certificate expires within 1 week. Reissuing..."
+    BACKUP_FILE="$VELO_CONFIG/server.config.yaml_$(date +%Y%m%d-%H%M).backup"
+    cp "$VELO_CONFIG/server.config.yaml" "$BACKUP_FILE"
+    echo "[INFO] Backup created at $BACKUP_FILE"
+    velociraptor --config "$VELO_CONFIG/server.config.yaml" config reissue_certs --validity 730 > "/tmp/server.config.yaml"
+    mv "/tmp/server.config.yaml" "$VELO_CONFIG/server.config.yaml"
+    echo "[INFO] Certificate reissued successfully."
+  fi
+fi

@@ -1,0 +1,4 @@
+#!/usr/bin/with-contenv sh
+
+# Start Velociraptor
+exec $VELO_BIN/velociraptor --config "$VELO_CONFIG/server.config.yaml" frontend $VELO_ARGS

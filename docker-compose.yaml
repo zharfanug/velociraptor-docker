@@ -1,0 +1,28 @@
+services:
+  velociraptor:
+    container_name: velociraptor
+    image: zharfanug/velociraptor:0.74.5
+    environment:
+      VELO_CERT: ${VELO_CERT:-/opt/velociraptor/certs/velociraptor.pem}
+      VELO_CERT_KEY: ${VELO_CERT_KEY:-/opt/velociraptor/certs/velociraptor.key}
+      VELO_FQDN: ${VELO_FQDN:-https://localhost:8000/}
+      VELO_PASSWORD: ${VELO_PASSWORD:-admin}
+      VELO_USER: ${VELO_USER:-admin}
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "8889:8889"
+    volumes:
+      - velociraptor-config:/etc/velociraptor
+      - velociraptor-data-ds:/opt/velociraptor/ds
+      - velociraptor-data-fs:/opt/velociraptor/fs
+      - velociraptor-files:/opt/velociraptor/files
+      - velociraptor-log:/var/log/velociraptor
+      - ./certs:/opt/velociraptor/certs:ro
+    restart: unless-stopped
+volumes:
+  velociraptor-config:
+  velociraptor-data-ds:
+  velociraptor-data-fs:
+  velociraptor-files:
+  velociraptor-log:
