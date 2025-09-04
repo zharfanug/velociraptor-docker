@@ -39,6 +39,7 @@ RUN mkdir -p "$VELO_CONFIG" "$VELO_DIR" "$VELO_DS" "$VELO_FS" "$VELO_BIN" "$VELO
   curl -s https://api.github.com/repos/velocidex/velociraptor/releases/latest > /tmp/velociraptor_releases && \
   LINUX_BIN=$(jq -r '[.assets | sort_by(.created_at) | reverse | .[] | .browser_download_url | select(test("linux-amd64$"))][0]' /tmp/velociraptor_releases) && \
   curl -L -so "$VELO_BIN/velociraptor" "$LINUX_BIN" && chmod +x "$VELO_BIN/velociraptor" && \
+  "$VELO_BIN/velociraptor" version && \
   rm /tmp/velociraptor_releases
 
 COPY config/etc/ /etc/

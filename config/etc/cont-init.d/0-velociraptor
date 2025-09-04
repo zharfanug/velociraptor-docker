@@ -9,6 +9,8 @@ if [ -z "$VELO_FQDN" ]; then
   VELO_FQDN="https://$VELO_HOSTNAME:8000/"
 fi
 
+velociraptor version
+
 if [ ! -f "$VELO_CONFIG/server.config.yaml" ]; then
   if [ ! -f "$VELO_CERT" ] || [ ! -f "$VELO_CERT_KEY" ]; then
     velociraptor config generate --merge '{"Client":{"server_urls":["'$VELO_FQDN'"],"use_self_signed_ssl":true,"writeback_windows":"HKLM\\SOFTWARE\\Velocidex\\Velociraptor"}, "Frontend":{"hostname":"'$VELO_HOSTNAME'"},"API":{"bind_address":"'$BIND_ADDRESS'"},"GUI":{"bind_address":"'$BIND_ADDRESS'"},"Monitoring":{"bind_address":"'$BIND_ADDRESS'"},"Logging":{"output_directory":"'$VELO_LOGS'","separate_logs_per_component":true},"Datastore":{"location":"'$VELO_DS'", "filestore_directory":"'$VELO_FS'"}}' > "$VELO_CONFIG/server.config.yaml"
