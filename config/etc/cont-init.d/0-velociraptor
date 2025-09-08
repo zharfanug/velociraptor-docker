@@ -1,5 +1,11 @@
 #!/usr/bin/with-contenv sh
 
+log() {
+  # $1 = level (INFO, WARN, ERROR)
+  # $2... = message
+  printf "%s %s : %s\n" "$(date '+%Y-%m-%d %H:%M:%S,%3N')" "$1" "$2"
+}
+
 BIND_ADDRESS="0.0.0.0"
 
 if [ -z "$VELO_HOSTNAME" ]; then
@@ -18,20 +24,71 @@ VELO_GUI_FQDN="${VELO_GUI_FQDN%/}/"
 velociraptor version
 
 if [ ! -f "$VELO_CONFIG/server.config.yaml" ]; then
-  if [ ! -f "$VELO_CERT" ] || [ ! -f "$VELO_CERT_KEY" ]; then
-    velociraptor config generate --merge '{"Client":{"server_urls":["'$VELO_CLIENT_FQDN'"],"use_self_signed_ssl":true,"writeback_windows":"HKLM\\SOFTWARE\\Velocidex\\Velociraptor"}, "Frontend":{"hostname":"'$VELO_HOSTNAME'"},"API":{"bind_address":"'$BIND_ADDRESS'"},"GUI":{"bind_address":"'$BIND_ADDRESS'","public_url":"'$VELO_GUI_FQDN'app/index.html"},"Monitoring":{"bind_address":"'$BIND_ADDRESS'"},"Logging":{"output_directory":"'$VELO_LOGS'","separate_logs_per_component":true},"Datastore":{"location":"'$VELO_DS'", "filestore_directory":"'$VELO_FS'"}}' > "$VELO_CONFIG/server.config.yaml"
-  else
-    velociraptor config generate --merge '{"Client":{"server_urls":["'$VELO_CLIENT_FQDN'"],"use_self_signed_ssl":false,"writeback_windows":"HKLM\\SOFTWARE\\Velocidex\\Velociraptor"},"Frontend":{"tls_certificate_filename":"'$VELO_CERT'","tls_private_key_filename":"'$VELO_CERT_KEY'","hostname":"'$VELO_HOSTNAME'"},"API":{"bind_address":"'$BIND_ADDRESS'"},"GUI":{"bind_address":"'$BIND_ADDRESS'","public_url":"'$VELO_GUI_FQDN'app/index.html"},"Monitoring":{"bind_address":"'$BIND_ADDRESS'"},"Logging":{"output_directory":"'$VELO_LOGS'","separate_logs_per_component":true},"Datastore":{"location":"'$VELO_DS'","filestore_directory":"'$VELO_FS'"}}' > "$VELO_CONFIG/server.config.yaml"
+  log "INFO" "No existing configuration found. Generating new configuration..."
+  MERGE_JSON="$(jq -n \
+    --arg client_fqdn "$VELO_CLIENT_FQDN" \
+    --arg host "$VELO_HOSTNAME" \
+    --arg bind "$BIND_ADDRESS" \
+    --arg gui_fqdn "$VELO_GUI_FQDN" \
+    --arg logs "$VELO_LOGS" \
+    --arg ds   "$VELO_DS" \
+    --arg fs   "$VELO_FS" '
+  {
+    Client:{
+      server_urls:[$client_fqdn],
+      use_self_signed_ssl:true,
+      writeback_windows:"HKLM\\SOFTWARE\\Velocidex\\Velociraptor"
+    },
+    Frontend:{
+      hostname:$host
+    },
+    API:{
+      bind_address:$bind
+    },
+    GUI:{
+      bind_address:$bind,
+      public_url:($gui_fqdn + "app/index.html")
+    },
+    Monitoring:{
+      bind_address:$bind
+    },
+    Logging:{
+      output_directory:$logs,
+      separate_logs_per_component:true
+    },
+    Datastore:{
+      location:$ds,
+      filestore_directory:$fs
+    }
+  }')";
+  if [ -f "$VELO_CERT" ] && [ -f "$VELO_CERT_KEY" ]; then
+    log "INFO" "Using provided TLS certificate and key."
+    MERGE_JSON="$(printf '%s' "$MERGE_JSON" | jq '.Client.use_self_signed_ssl=false')"
+    MERGE_JSON="$(printf '%s' "$MERGE_JSON" | jq --arg cert "${VELO_CERT}" '.Frontend.tls_certificate_filename=$cert')"
+    MERGE_JSON="$(printf '%s' "$MERGE_JSON" | jq --arg key "${VELO_CERT_KEY}" '.Frontend.tls_private_key_filename=$key')"
+    if [ -f "$VELO_CA" ]; then
+      log "INFO" "Using provided CA certificate."
+      MERGE_JSON="$(printf '%s' "$MERGE_JSON" | jq --rawfile roots "$VELO_CA" '.Client.Crypto.root_certs=$roots')"      
+    fi
   fi
+
+  log "INFO" "Generating configuration file at $VELO_CONFIG/server.config.yaml"
+  velociraptor config generate --merge "$MERGE_JSON" > "$VELO_CONFIG/server.config.yaml"
+
   if [ -z "$VELO_USER" ]; then
+    log "WARN" "No VELO_USER specified. Defaulting to 'admin'."
     VELO_USER="admin"
   fi
   if [ -z "$VELO_PASSWORD" ]; then
+    log "WARN" "No VELO_PASSWORD specified. Defaulting to 'admin'."
     VELO_PASSWORD="admin"
   fi
+  log "INFO" "Creating initial user '$VELO_USER'."
   velociraptor --config "$VELO_CONFIG/server.config.yaml" user add $VELO_USER $VELO_PASSWORD --role "administrator"
-  velociraptor --config "$VELO_CONFIG/server.config.yaml" config api_client --name $VELO_USER --role administrator "${VELO_FILES}/api.config.yaml"
+  log "INFO" "Creating API client configuration at ${VELO_FILES}/api.config.yaml"
+  velociraptor --config "$VELO_CONFIG/server.config.yaml" config api_client --name $VELO_USER --role "administrator" "${VELO_FILES}/api.config.yaml"
   if [ -n "${VELO_API_HOST:-}" ]; then
+    log "INFO" "Setting API host to $VELO_API_HOST"
     sed -i "s|0.0.0.0|$VELO_API_HOST|" "${VELO_FILES}/api.config.yaml"
   fi
 fi
@@ -39,14 +96,14 @@ fi
 USE_SELF_SIGNED=$(velociraptor --config "$VELO_CONFIG/server.config.yaml" config show --json | jq -r '.Client.use_self_signed_ssl')
 if [ "$USE_SELF_SIGNED" = "true" ]; then
   if true | velociraptor --config "$VELO_CONFIG/server.config.yaml" config show --json | jq -r .Frontend.certificate | openssl x509 -text -enddate -noout -checkend 604800 >/dev/null; then
-    echo "[INFO] Certificate is valid for more than 1 week. No action taken."
+    log "INFO" "Certificate is valid for more than 1 week. No action taken."
   else
-    echo "[INFO] Certificate expires within 1 week. Reissuing..."
+    log "INFO" "Certificate expires within 1 week. Reissuing..."
     BACKUP_FILE="$VELO_CONFIG/server.config.yaml_$(date +%Y%m%d-%H%M).backup"
     cp "$VELO_CONFIG/server.config.yaml" "$BACKUP_FILE"
-    echo "[INFO] Backup created at $BACKUP_FILE"
+    log "INFO" "Backup created at $BACKUP_FILE"
     velociraptor --config "$VELO_CONFIG/server.config.yaml" config reissue_certs --validity 730 > "/tmp/server.config.yaml"
     mv "/tmp/server.config.yaml" "$VELO_CONFIG/server.config.yaml"
-    echo "[INFO] Certificate reissued successfully."
+    log "INFO" "Certificate reissued successfully."
   fi
 fi
