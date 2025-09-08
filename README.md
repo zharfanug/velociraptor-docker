@@ -24,7 +24,7 @@ docker run -d --name velociraptor \
   -p 8000:8000 \
   -p 8001:8001 \
   -p 8889:8889 \
-  zharfanug/velociraptor:latest
+  zharfanug/velociraptor:0.75.1
 ```
 
 # Environment
@@ -33,7 +33,8 @@ The image sets the following defaults:
 | Variable           | Default                       | Purpose                                                                                             |
 |--------------------|-------------------------------|-----------------------------------------------------------------------------------------------------|
 | `VELO_CERT`        | auto-generated self-signed    | Path to the TLS certificate used by the server. If omitted, a self-signed certificate is generated. |
-| `VELO_CERT_KEY`    | auto-generated key            | Path to the TLS private key. Must match `VELO_CERT`. If omitted, a key is generated.                |
+| `VELO_CERT_KEY`    | auto-generated key            | Path to the TLS private key corresponding to `VELO_CERT`.                                           |
+| `VELO_CA`          | -                             | Path to a Certificate Authority (CA) bundle file. Used for clients to trust the server certificate. |
 | `VELO_CLIENT_FQDN` | `https://localhost:8000/`     | Public URL advertised to clients.                                                                   |
 | `VELO_GUI_FQDN`    | `https://localhost:8889/`     | Public URL for the Velociraptor web UI.                                                             |
 | `VELO_USER`        | `admin`                       | Initial administrator username for the web UI.                                                      |
