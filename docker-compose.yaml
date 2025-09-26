@@ -1,7 +1,7 @@
 services:
   velociraptor:
     container_name: velociraptor
-    image: zharfanug/velociraptor:latest
+    image: zharfanug/velociraptor:0.75.2
     environment:
       VELO_CERT: ${VELO_CERT:-}
       VELO_CERT_KEY: ${VELO_CERT_KEY:-}
@@ -9,8 +9,8 @@ services:
       VELO_CLIENT_FQDN: ${VELO_CLIENT_FQDN:-}
       VELO_GUI_FQDN: ${VELO_GUI_FQDN:-}
       VELO_API_HOST: ${VELO_API_HOST:-}
-      VELO_PASSWORD: ${VELO_PASSWORD:-}
       VELO_USER: ${VELO_USER:-}
+      VELO_PASSWORD: ${VELO_PASSWORD:-}
     ports:
       - "8000:8000"
       - "8001:8001"

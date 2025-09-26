@@ -19,7 +19,7 @@ if [ -z "$VELO_GUI_FQDN" ]; then
 fi
 VELO_CLIENT_FQDN="${VELO_CLIENT_FQDN%/}/"
 VELO_GUI_FQDN="${VELO_GUI_FQDN%/}/"
-
+VELO_API_CONFIG_FILE="${VELO_API_CONFIG_FILE:-api.config.yaml}"
 
 velociraptor version
 
@@ -85,11 +85,11 @@ if [ ! -f "$VELO_CONFIG/server.config.yaml" ]; then
   fi
   log "INFO" "Creating initial user '$VELO_USER'."
   velociraptor --config "$VELO_CONFIG/server.config.yaml" user add $VELO_USER $VELO_PASSWORD --role "administrator"
-  log "INFO" "Creating API client configuration at ${VELO_FILES}/api.config.yaml"
-  velociraptor --config "$VELO_CONFIG/server.config.yaml" config api_client --name $VELO_USER --role "administrator" "${VELO_FILES}/api.config.yaml"
+  log "INFO" "Creating API client configuration at ${VELO_FILES}/${VELO_API_CONFIG_FILE}"
+  velociraptor --config "$VELO_CONFIG/server.config.yaml" config api_client --name $VELO_USER --role "administrator" "${VELO_FILES}/${VELO_API_CONFIG_FILE}"
   if [ -n "${VELO_API_HOST:-}" ]; then
     log "INFO" "Setting API host to $VELO_API_HOST"
-    sed -i "s|0.0.0.0|$VELO_API_HOST|" "${VELO_FILES}/api.config.yaml"
+    sed -i "s|0.0.0.0|$VELO_API_HOST|" "${VELO_FILES}/${VELO_API_CONFIG_FILE}"
   fi
 fi
 
