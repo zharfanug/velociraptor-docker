@@ -1,7 +1,7 @@
 services:
   velociraptor:
     container_name: velociraptor
-    image: zharfanug/velociraptor:0.75.2
+    image: zharfanug/velociraptor:latest
     environment:
       VELO_CERT: ${VELO_CERT:-}
       VELO_CERT_KEY: ${VELO_CERT_KEY:-}
